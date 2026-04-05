@@ -1,593 +1,374 @@
 import streamlit as st
+import matplotlib
+matplotlib.use('Agg')  # Must be before pyplot import
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.patches import FancyBboxPatch, Circle, Rectangle, Polygon, Arc
-from matplotlib.collections import PatchCollection
+from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 import io
 from datetime import datetime
 import base64
-from matplotlib.lines import Line2D
 
 # Page configuration
 st.set_page_config(
-    page_title="Architectural Blueprint Pro | Professional Site Planning Tool",
+    page_title="Architectural Blueprint Pro",
     page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional look
+# Simple CSS (no external fonts)
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-    
     .main-header {
-        font-family: 'Inter', sans-serif;
         font-size: 2.5rem;
-        font-weight: 700;
+        font-weight: bold;
         color: #1a1a1a;
         text-align: center;
         margin-bottom: 0.5rem;
-        letter-spacing: -0.02em;
     }
-    
     .sub-header {
-        font-family: 'Inter', sans-serif;
         font-size: 1.1rem;
         color: #666;
         text-align: center;
         margin-bottom: 2rem;
-        font-weight: 400;
     }
-    
-    .blueprint-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-radius: 12px;
-        padding: 2rem;
-        border: 1px solid #dee2e6;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-    }
-    
-    .metric-box {
-        background: white;
-        border-radius: 8px;
-        padding: 1rem;
-        border-left: 4px solid #0066cc;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
     .stButton>button {
-        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+        background-color: #0066cc;
         color: white;
+        font-weight: bold;
         border: none;
         padding: 0.75rem 2rem;
         border-radius: 8px;
-        font-weight: 600;
-        font-size: 1rem;
-        transition: all 0.3s ease;
     }
-    
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,102,204,0.3);
-    }
-    
-    .professional-input {
-        border-radius: 6px;
-        border: 1px solid #ced4da;
-    }
-    
-    .disclaimer-box {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
+    .metric-box {
+        background-color: #f0f2f6;
         border-radius: 8px;
         padding: 1rem;
-        font-size: 0.85rem;
-        color: #856404;
-        margin-top: 1rem;
-    }
-    
-    .section-title {
-        font-family: 'Inter', sans-serif;
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #0066cc;
+        border-left: 4px solid #0066cc;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def create_architectural_blueprint(params):
-    """Create professional architectural blueprint"""
+def create_blueprint(params):
+    """Create professional blueprint"""
     
     # Extract parameters
     project_name = params['project_name']
     client_name = params['client_name']
-    site_width = params['site_width']
-    site_depth = params['site_depth']
-    building_width = params['building_width']
-    building_depth = params['building_depth']
-    setbacks = params['setbacks']  # [front, back, left, right]
-    orientation = params['orientation']
-    scale = params['scale']
+    site_width = float(params['site_width'])
+    site_depth = float(params['site_depth'])
+    building_width = float(params['building_width'])
+    building_depth = float(params['building_depth'])
+    setbacks = [float(x) for x in params['setbacks']]
+    orientation = float(params['orientation'])
+    scale = int(params['scale'])
     units = params['units']
-    drawing_standard = params['drawing_standard']
-    plot_type = params['plot_type']
     
-    # Create figure with professional size (A3 landscape = 16.5 x 11.7 inches)
-    fig = plt.figure(figsize=(16.5, 11.7), dpi=300)
-    ax = fig.add_subplot(111)
+    # Create figure (A3 landscape approximation)
+    fig, ax = plt.subplots(figsize=(16, 11), dpi=150)
     
-    # Professional blueprint color scheme
-    bg_color = '#f8f9fa'
-    grid_color = '#e9ecef'
-    border_color = '#2c3e50'
-    building_color = '#34495e'
+    # Colors
+    bg_color = '#ffffff'
+    grid_color = '#e0e0e0'
+    border_color = '#000000'
+    building_color = '#2c3e50'
     building_fill = '#ecf0f1'
     setback_color = '#e74c3c'
     dimension_color = '#0066cc'
-    text_color = '#2c3e50'
     north_color = '#c0392b'
     
     ax.set_facecolor(bg_color)
     
-    # Calculate dimensions
-    margin = max(site_width, site_depth) * 0.15
-    total_width = site_width + 2 * margin
-    total_depth = site_depth + 2 * margin
-    
+    # Calculate margins
+    margin = max(site_width, site_depth) * 0.2
     ax.set_xlim(-margin, site_width + margin)
     ax.set_ylim(-margin, site_depth + margin)
     ax.set_aspect('equal')
     
-    # Draw professional grid
-    grid_spacing = max(site_width, site_depth) / 20
-    for x in np.arange(0, site_width + grid_spacing, grid_spacing):
-        ax.axvline(x=x, color=grid_color, linewidth=0.5, alpha=0.6, linestyle='-')
-    for y in np.arange(0, site_depth + grid_spacing, grid_spacing):
-        ax.axhline(y=y, color=grid_color, linewidth=0.5, alpha=0.6, linestyle='-')
+    # Draw grid
+    grid_size = max(site_width, site_depth) / 10
+    for x in np.arange(0, site_width + grid_size, grid_size):
+        ax.axvline(x=x, color=grid_color, linewidth=0.5, alpha=0.5)
+    for y in np.arange(0, site_depth + grid_size, grid_size):
+        ax.axhline(y=y, color=grid_color, linewidth=0.5, alpha=0.5)
     
-    # Draw site boundary with professional line weight
-    site_boundary = Rectangle((0, 0), site_width, site_depth, 
-                             linewidth=3, edgecolor=border_color, 
-                             facecolor='none', linestyle='-')
-    ax.add_patch(site_boundary)
+    # Site boundary
+    site = Rectangle((0, 0), site_width, site_depth, 
+                     linewidth=2.5, edgecolor=border_color, 
+                     facecolor='none')
+    ax.add_patch(site)
     
-    # Draw setbacks (dashed lines)
+    # Setbacks
     front, back, left, right = setbacks
+    
+    # Buildable area
     buildable_x = left
     buildable_y = back
-    buildable_width = site_width - left - right
-    buildable_height = site_depth - front - back
+    buildable_w = site_width - left - right
+    buildable_h = site_depth - front - back
     
-    # Front setback
+    # Draw setback lines
     if front > 0:
         ax.plot([0, site_width], [site_depth - front, site_depth - front], 
                 'r--', linewidth=1.5, alpha=0.7)
-        ax.fill_between([0, site_width], [site_depth - front, site_depth - front], 
-                       [site_depth, site_depth], color='#ffebee', alpha=0.3)
-    
-    # Back setback
     if back > 0:
         ax.plot([0, site_width], [back, back], 'r--', linewidth=1.5, alpha=0.7)
-        ax.fill_between([0, site_width], [0, 0], [back, back], color='#ffebee', alpha=0.3)
-    
-    # Left setback
     if left > 0:
         ax.plot([left, left], [0, site_depth], 'r--', linewidth=1.5, alpha=0.7)
-        ax.fill_between([0, left], [0, 0], [site_depth, site_depth], color='#ffebee', alpha=0.3)
-    
-    # Right setback
     if right > 0:
         ax.plot([site_width - right, site_width - right], [0, site_depth], 
                 'r--', linewidth=1.5, alpha=0.7)
-        ax.fill_between([site_width - right, site_width], [0, 0], 
-                       [site_depth, site_depth], color='#ffebee', alpha=0.3)
     
-    # Draw building footprint
-    building_x = left + (buildable_width - building_width) / 2
-    building_y = back + (buildable_height - building_depth) / 2
+    # Building position (centered in buildable area)
+    building_x = buildable_x + (buildable_w - building_width) / 2
+    building_y = buildable_y + (buildable_h - building_depth) / 2
     
+    # Draw building
     building = FancyBboxPatch(
         (building_x, building_y), building_width, building_depth,
         boxstyle="square,pad=0",
-        linewidth=2.5, edgecolor=building_color,
+        linewidth=2, edgecolor=building_color,
         facecolor=building_fill, alpha=0.9
     )
     ax.add_patch(building)
     
-    # Add hatching pattern to building
-    hatch_spacing = min(building_width, building_depth) / 15
-    for i in range(int(building_width / hatch_spacing) + 1):
-        x = building_x + i * hatch_spacing
-        if x <= building_x + building_width:
-            ax.plot([x, x], [building_y, building_y + building_depth], 
-                   'k-', linewidth=0.3, alpha=0.3)
-    
-    # Add building dimensions inside
+    # Building label
     ax.text(building_x + building_width/2, building_y + building_depth/2, 
            f'{building_width:.1f} x {building_depth:.1f}\n{units}', 
-           ha='center', va='center', fontsize=10, fontweight='bold',
-           color=building_color, family='monospace')
+           ha='center', va='center', fontsize=9, fontweight='bold',
+           color=building_color)
     
-    # Professional dimension lines with arrows
-    def draw_dimension(ax, x1, y1, x2, y2, offset, text, flip=False):
-        # Extension lines
-        ext_length = 0.3
-        angle = np.arctan2(y2-y1, x2-x1)
-        perp_x = -np.sin(angle) * offset
-        perp_y = np.cos(angle) * offset
-        
-        # Draw extension lines
-        ax.plot([x1, x1 + perp_x*ext_length], [y1, y1 + perp_y*ext_length], 
-               'k-', linewidth=0.8)
-        ax.plot([x2, x2 + perp_x*ext_length], [y2, y2 + perp_y*ext_length], 
-               'k-', linewidth=0.8)
-        
-        # Dimension line
-        dim_x1, dim_y1 = x1 + perp_x, y1 + perp_y
-        dim_x2, dim_y2 = x2 + perp_x, y2 + perp_y
-        
-        # Draw arrows
-        arrow_style = patches.FancyArrowPatch(
-            (dim_x1, dim_y1), (dim_x2, dim_y2),
-            arrowstyle='<->', mutation_scale=15,
-            color=dimension_color, linewidth=1.2
-        )
-        ax.add_patch(arrow_style)
-        
-        # Text
-        mid_x = (dim_x1 + dim_x2) / 2
-        mid_y = (dim_y1 + dim_y2) / 2
-        text_angle = np.degrees(angle)
-        if flip:
-            text_angle += 180
-        
-        ax.text(mid_x, mid_y, text, ha='center', va='center',
-               fontsize=9, color=dimension_color, fontweight='bold',
-               rotation=text_angle if abs(text_angle) < 90 else text_angle + 180,
-               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
-                        edgecolor='none', alpha=0.8))
+    # Dimension lines
+    def draw_dim(x1, y1, x2, y2, offset, text, vertical=False):
+        if vertical:
+            ax.annotate('', xy=(x1 - offset, y1), xytext=(x1 - offset, y2),
+                       arrowprops=dict(arrowstyle='<->', color=dimension_color, lw=1.5))
+            ax.text(x1 - offset - 0.5, (y1 + y2)/2, text, 
+                   fontsize=8, color=dimension_color, ha='right', va='center',
+                   rotation=90)
+        else:
+            ax.annotate('', xy=(x1, y1 - offset), xytext=(x2, y1 - offset),
+                       arrowprops=dict(arrowstyle='<->', color=dimension_color, lw=1.5))
+            ax.text((x1 + x2)/2, y1 - offset - 0.3, text, 
+                   fontsize=8, color=dimension_color, ha='center', va='top')
     
     # Site dimensions
-    offset = margin * 0.4
-    draw_dimension(ax, 0, 0, site_width, 0, -offset, f'{site_width:.1f} {units}')
-    draw_dimension(ax, 0, 0, 0, site_depth, -offset, f'{site_depth:.1f} {units}', flip=True)
+    draw_dim(0, 0, site_width, 0, margin*0.3, f'{site_width:.1f} {units}')
+    draw_dim(0, 0, 0, site_depth, margin*0.3, f'{site_depth:.1f} {units}', vertical=True)
     
     # Building dimensions
-    b_offset = 0.5
-    draw_dimension(ax, building_x, building_y - b_offset, 
-                  building_x + building_width, building_y - b_offset, 
-                  -b_offset, f'{building_width:.1f}')
-    draw_dimension(ax, building_x - b_offset, building_y, 
-                  building_x - b_offset, building_y + building_depth, 
-                  -b_offset, f'{building_depth:.1f}', flip=True)
+    draw_dim(building_x, building_y, building_x + building_width, building_y, 
+             0.4, f'{building_width:.1f}')
+    draw_dim(building_x, building_y, building_x, building_y + building_depth, 
+             0.4, f'{building_depth:.1f}', vertical=True)
     
-    # Setback dimensions
-    if front > 0:
-        ax.annotate('', xy=(site_width + 0.8, site_depth), 
-                   xytext=(site_width + 0.8, site_depth - front),
-                   arrowprops=dict(arrowstyle='<->', color=setback_color, lw=1.5))
-        ax.text(site_width + 1.2, site_depth - front/2, f'Front\n{front:.1f}', 
-               fontsize=8, color=setback_color, va='center')
-    
-    if back > 0:
-        ax.annotate('', xy=(site_width + 0.8, back), 
-                   xytext=(site_width + 0.8, 0),
-                   arrowprops=dict(arrowstyle='<->', color=setback_color, lw=1.5))
-        ax.text(site_width + 1.2, back/2, f'Rear\n{back:.1f}', 
-               fontsize=8, color=setback_color, va='center')
-    
-    # North arrow (professional style)
+    # North arrow
     north_x = site_width - 2
     north_y = site_depth - 2
-    arrow_length = 1.5
+    arrow_len = 1.5
     
-    # Rotate based on orientation
     angle_rad = np.radians(orientation)
-    dx = arrow_length * np.sin(angle_rad)
-    dy = arrow_length * np.cos(angle_rad)
+    dx = arrow_len * np.sin(angle_rad)
+    dy = arrow_len * np.cos(angle_rad)
     
     ax.annotate('N', xy=(north_x + dx, north_y + dy), 
                xytext=(north_x, north_y),
-               arrowprops=dict(arrowstyle='->', color=north_color, lw=3),
-               fontsize=14, color=north_color, fontweight='bold', ha='center')
+               arrowprops=dict(arrowstyle='->', color=north_color, lw=2.5),
+               fontsize=12, color=north_color, fontweight='bold', ha='center')
     
-    # Circle around N
-    circle = Circle((north_x, north_y), 0.3, fill=False, 
+    circle = Circle((north_x, north_y), 0.25, fill=False, 
                    edgecolor=north_color, linewidth=1.5)
     ax.add_patch(circle)
     
-    # Title block (professional standard)
-    title_block_width = 6
-    title_block_height = 2.5
-    title_x = site_width - title_block_width - 0.5
-    title_y = 0.5
+    # Title block
+    tb_w = 5
+    tb_h = 2
+    tb_x = site_width - tb_w - 0.5
+    tb_y = 0.5
     
-    # Title block background
-    title_bg = FancyBboxPatch(
-        (title_x, title_y), title_block_width, title_block_height,
-        boxstyle="square,pad=0", linewidth=2, edgecolor='black',
-        facecolor='white'
-    )
-    ax.add_patch(title_bg)
+    # Title block border
+    ax.add_patch(Rectangle((tb_x, tb_y), tb_w, tb_h, 
+                          linewidth=1.5, edgecolor='black', facecolor='white'))
     
-    # Title block grid
-    ax.plot([title_x, title_x + title_block_width], 
-           [title_y + title_block_height - 0.6, title_y + title_block_height - 0.6], 
-           'k-', linewidth=1)
-    ax.plot([title_x + title_block_width * 0.6, title_x + title_block_width * 0.6], 
-           [title_y, title_y + title_block_height], 'k-', linewidth=1)
-    ax.plot([title_x, title_x + title_block_width], 
-           [title_y + 0.6, title_y + 0.6], 'k-', linewidth=0.5)
+    # Title block lines
+    ax.plot([tb_x, tb_x + tb_w], [tb_y + tb_h - 0.5, tb_y + tb_h - 0.5], 'k-', lw=1)
+    ax.plot([tb_x + tb_w*0.6, tb_x + tb_w*0.6], [tb_y, tb_y + tb_h], 'k-', lw=1)
     
     # Title block text
-    ax.text(title_x + title_block_width/2, title_y + title_block_height - 0.3, 
-           project_name.upper(), ha='center', va='center', 
-           fontsize=12, fontweight='bold', family='sans-serif')
-    ax.text(title_x + title_block_width/2, title_y + title_block_height - 0.9, 
-           'SITE PLAN', ha='center', va='center', 
-           fontsize=10, family='sans-serif')
-    ax.text(title_x + 0.2, title_y + 0.3, f'Client: {client_name}', 
-           fontsize=8, va='center')
-    ax.text(title_x + 0.2, title_y + 1.0, f'Scale: 1:{scale}', 
-           fontsize=8, va='center')
-    ax.text(title_x + title_block_width * 0.8, title_y + 0.3, 
+    ax.text(tb_x + tb_w/2, tb_y + tb_h - 0.25, project_name.upper(), 
+           ha='center', va='center', fontsize=10, fontweight='bold')
+    ax.text(tb_x + tb_w/2, tb_y + tb_h - 0.75, 'SITE PLAN', 
+           ha='center', va='center', fontsize=9)
+    ax.text(tb_x + 0.2, tb_y + 0.25, f'Client: {client_name}', fontsize=7, va='center')
+    ax.text(tb_x + 0.2, tb_y + 0.75, f'Scale: 1:{scale}', fontsize=7, va='center')
+    ax.text(tb_x + tb_w*0.8, tb_y + 0.25, 
            f'Date: {datetime.now().strftime("%Y-%m-%d")}', 
-           fontsize=8, va='center', ha='center')
-    ax.text(title_x + title_block_width * 0.8, title_y + 1.0, 
-           f'Drawn: AutoCAD Pro', fontsize=8, va='center', ha='center')
+           fontsize=7, va='center', ha='center')
     
     # Scale bar
-    scale_bar_x = 1
-    scale_bar_y = 1
-    real_length = 5  # 5 units
-    drawing_length = real_length * (1000 / scale) * 0.001  # Convert to drawing units
+    sb_x = 1
+    sb_y = 1
+    real_len = 5
+    draw_len = real_len * (1000/scale) * 0.001
     
-    ax.plot([scale_bar_x, scale_bar_x + drawing_length], [scale_bar_y, scale_bar_y], 
-           'k-', linewidth=3)
-    ax.plot([scale_bar_x, scale_bar_x], [scale_bar_y - 0.1, scale_bar_y + 0.1], 'k-', lw=2)
-    ax.plot([scale_bar_x + drawing_length, scale_bar_x + drawing_length], 
-           [scale_bar_y - 0.1, scale_bar_y + 0.1], 'k-', lw=2)
-    ax.text(scale_bar_x + drawing_length/2, scale_bar_y - 0.3, 
-           f'{real_length} {units}', ha='center', fontsize=9, fontweight='bold')
+    ax.plot([sb_x, sb_x + draw_len], [sb_y, sb_y], 'k-', lw=3)
+    ax.plot([sb_x, sb_x], [sb_y - 0.1, sb_y + 0.1], 'k-', lw=2)
+    ax.plot([sb_x + draw_len, sb_x + draw_len], [sb_y - 0.1, sb_y + 0.1], 'k-', lw=2)
+    ax.text(sb_x + draw_len/2, sb_y - 0.3, f'{real_len} {units}', 
+           ha='center', fontsize=8, fontweight='bold')
     
-    # Disclaimer text at bottom
-    disclaimer = (
-        "DISCLAIMER: This drawing is for conceptual planning purposes only. "
-        "All dimensions must be verified on site before construction. "
-        "Complies with IBC 2024/2025 & local building codes. "
-        "Not for construction without engineer stamp."
-    )
-    ax.text(site_width/2, -margin * 0.6, disclaimer, ha='center', va='top',
-           fontsize=7, style='italic', color='#666666', wrap=True)
+    # Disclaimer
+    disclaimer = "DISCLAIMER: For planning only. Verify all dimensions on site. Complies with IBC 2024/2025."
+    ax.text(site_width/2, -margin*0.5, disclaimer, ha='center', va='top',
+           fontsize=7, style='italic', color='#666666')
     
-    # Remove axes for professional look
     ax.axis('off')
-    
-    # Add subtle border
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_linewidth(0.5)
-        spine.set_color('#cccccc')
-    
     plt.tight_layout()
     return fig
 
 def generate_pdf(fig, params):
-    """Generate professional PDF with multiple sheets"""
+    """Generate PDF package"""
     buffer = io.BytesIO()
     
     with PdfPages(buffer) as pdf:
-        # Sheet 1: Site Plan
-        pdf.savefig(fig, dpi=300, bbox_inches='tight', facecolor='white')
+        # Sheet 1: Blueprint
+        pdf.savefig(fig, dpi=200, bbox_inches='tight', facecolor='white')
         
-        # Sheet 2: Data Sheet
-        fig2 = plt.figure(figsize=(11.7, 16.5), dpi=300)
-        ax2 = fig2.add_subplot(111)
+        # Sheet 2: Data
+        fig2, ax2 = plt.subplots(figsize=(11, 16), dpi=150)
         ax2.axis('off')
         
-        # Professional data sheet layout
-        y_pos = 0.95
-        line_height = 0.04
+        y = 0.95
+        dy = 0.03
         
-        ax2.text(0.5, y_pos, 'ARCHITECTURAL SITE ANALYSIS REPORT', 
-                ha='center', fontsize=20, fontweight='bold')
-        y_pos -= line_height * 2
+        ax2.text(0.5, y, 'ARCHITECTURAL SITE ANALYSIS', ha='center', fontsize=16, fontweight='bold')
+        y -= dy * 2
         
-        # Project info
-        ax2.text(0.1, y_pos, f'Project: {params["project_name"]}', fontsize=12, fontweight='bold')
-        y_pos -= line_height
-        ax2.text(0.1, y_pos, f'Client: {params["client_name"]}', fontsize=11)
-        y_pos -= line_height
-        ax2.text(0.1, y_pos, f'Location: {params.get("location", "Not specified")}', fontsize=11)
-        y_pos -= line_height * 2
+        ax2.text(0.1, y, f'Project: {params["project_name"]}', fontsize=11, fontweight='bold')
+        y -= dy
+        ax2.text(0.1, y, f'Client: {params["client_name"]}', fontsize=10)
+        y -= dy
+        ax2.text(0.1, y, f'Location: {params.get("location", "N/A")}', fontsize=10)
+        y -= dy * 2
         
-        # Site data table
-        ax2.text(0.1, y_pos, 'SITE SPECIFICATIONS', fontsize=14, fontweight='bold', 
-                bbox=dict(boxstyle='round', facecolor='#f0f0f0'))
-        y_pos -= line_height * 1.5
+        # Data table
+        ax2.text(0.1, y, 'SITE DATA', fontsize=12, fontweight='bold', 
+                bbox=dict(boxstyle='round', facecolor='#e0e0e0'))
+        y -= dy * 1.5
         
-        data_rows = [
-            ['Parameter', 'Value', 'Notes'],
-            ['Site Width', f'{params["site_width"]} {params["units"]}', ''],
-            ['Site Depth', f'{params["site_depth"]} {params["units"]}', ''],
-            ['Site Area', f'{params["site_width"] * params["site_depth"]:.2f} sq {params["units"]}', ''],
-            ['Building Width', f'{params["building_width"]} {params["units"]}', ''],
-            ['Building Depth', f'{params["building_depth"]} {params["units"]}', ''],
-            ['Building Area', f'{params["building_width"] * params["building_depth"]:.2f} sq {params["units"]}', ''],
-            ['Coverage Ratio', f'{(params["building_width"] * params["building_depth"])/(params["site_width"] * params["site_depth"])*100:.1f}%', 'Max typically 40-60%'],
-            ['Front Setback', f'{params["setbacks"][0]} {params["units"]}', ''],
-            ['Rear Setback', f'{params["setbacks"][1]} {params["units"]}', ''],
-            ['Left Setback', f'{params["setbacks"][2]} {params["units"]}', ''],
-            ['Right Setback', f'{params["setbacks"][3]} {params["units"]}', ''],
-            ['Orientation', f'{params["orientation"]}°', 'Clockwise from North'],
-            ['Drawing Standard', params["drawing_standard"], ''],
-            ['Scale', f'1:{params["scale"]}', ''],
-            ['Plot Type', params["plot_type"], ''],
+        site_area = float(params['site_width']) * float(params['site_depth'])
+        bldg_area = float(params['building_width']) * float(params['building_depth'])
+        coverage = (bldg_area / site_area) * 100
+        
+        data = [
+            ['Site Dimensions', f"{params['site_width']} x {params['site_depth']} {params['units']}"],
+            ['Site Area', f"{site_area:.1f} sq {params['units']}"],
+            ['Building Footprint', f"{bldg_area:.1f} sq {params['units']}"],
+            ['Site Coverage', f"{coverage:.1f}%"],
+            ['Front Setback', f"{params['setbacks'][0]} {params['units']}"],
+            ['Rear Setback', f"{params['setbacks'][1]} {params['units']}"],
+            ['Left Setback', f"{params['setbacks'][2]} {params['units']}"],
+            ['Right Setback', f"{params['setbacks'][3]} {params['units']}"],
+            ['Scale', f"1:{params['scale']}"],
+            ['Orientation', f"{params['orientation']}°"],
         ]
         
-        for i, row in enumerate(data_rows):
-            if i == 0:
-                weight = 'bold'
-                bg = '#e0e0e0'
-            else:
-                weight = 'normal'
-                bg = 'white' if i % 2 == 0 else '#f9f9f9'
-            
-            ax2.add_patch(patches.Rectangle((0.08, y_pos - 0.015), 0.84, 0.03, 
-                                          facecolor=bg, edgecolor='black', linewidth=0.5))
-            ax2.text(0.1, y_pos, row[0], fontsize=9, fontweight=weight, va='center')
-            ax2.text(0.4, y_pos, row[1], fontsize=9, fontweight=weight, va='center')
-            ax2.text(0.6, y_pos, row[2], fontsize=8, style='italic', va='center')
-            y_pos -= line_height
+        for i, (label, value) in enumerate(data):
+            bg = '#f0f0f0' if i % 2 == 0 else 'white'
+            ax2.add_patch(Rectangle((0.08, y-0.01), 0.84, 0.025, facecolor=bg, edgecolor='gray'))
+            ax2.text(0.1, y, label, fontsize=9, va='center')
+            ax2.text(0.5, y, value, fontsize=9, va='center', fontweight='bold')
+            y -= dy
         
-        y_pos -= line_height
+        y -= dy
         
-        # Compliance section
-        ax2.text(0.1, y_pos, 'CODE COMPLIANCE & STANDARDS', fontsize=14, 
-                fontweight='bold', bbox=dict(boxstyle='round', facecolor='#f0f0f0'))
-        y_pos -= line_height * 1.5
+        # Compliance
+        ax2.text(0.1, y, 'CODE COMPLIANCE', fontsize=12, fontweight='bold',
+                bbox=dict(boxstyle='round', facecolor='#e0e0e0'))
+        y -= dy * 1.5
         
-        compliance_text = [
-            "• International Building Code (IBC) 2024/2025 Edition",
-            "• International Residential Code (IRC) 2024/2025 Edition",
-            "• ANSI/ASME Y14.5 Dimensioning and Tolerancing Standards",
-            "• Local Zoning Ordinances and Land Use Regulations",
-            "• ADA Accessibility Guidelines (2010/2024 Standards)",
-            "• NFPA 101 Life Safety Code 2024 Edition",
-            "• Local Fire Code Requirements",
+        codes = [
+            "• International Building Code (IBC) 2024/2025",
+            "• International Residential Code (IRC) 2024/2025", 
+            "• ANSI Y14.5 Dimensioning Standards",
+            "• NFPA 101 Life Safety Code 2024",
+            "• ADA Standards for Accessible Design"
         ]
         
-        for text in compliance_text:
-            ax2.text(0.1, y_pos, text, fontsize=9)
-            y_pos -= line_height
+        for code in codes:
+            ax2.text(0.1, y, code, fontsize=9)
+            y -= dy
         
-        y_pos -= line_height
+        y -= dy
         
-        # Professional disclaimer
-        ax2.text(0.1, y_pos, 'LEGAL DISCLAIMER', fontsize=14, 
-                fontweight='bold', color='#d32f2f', 
-                bbox=dict(boxstyle='round', facecolor='#ffebee'))
-        y_pos -= line_height * 1.5
+        # Disclaimer box
+        ax2.text(0.1, y, 'LEGAL DISCLAIMER', fontsize=11, fontweight='bold', color='darkred')
+        y -= dy
         
-        disclaimer_text = (
-            "This architectural drawing and report are generated for preliminary planning "
-            "and visualization purposes only. All dimensions, setbacks, and calculations "
-            "must be verified by a licensed architect, civil engineer, or surveyor before "
-            "any construction activity. The user assumes full responsibility for ensuring "
-            "compliance with all applicable local, state, and federal building codes, "
-            "zoning ordinances, and regulations. This tool does not replace professional "
-            "architectural or engineering services. Construction without proper permits "
-            "and professional stamps is prohibited and may result in legal penalties. "
-            f"Generated on {datetime.now().strftime('%B %d, %Y')} | "
-            "Valid for planning purposes only."
-        )
+        disc_text = ("This drawing is for conceptual planning only. All dimensions must be verified "
+                    "by a licensed professional before construction. User assumes responsibility for "
+                    "code compliance. Not for construction without engineer/architect stamp.")
         
-        # Wrap disclaimer text
-        words = disclaimer_text.split()
-        lines = []
-        current_line = ""
-        for word in words:
-            if len(current_line + word) < 100:
-                current_line += word + " "
-            else:
-                lines.append(current_line)
-                current_line = word + " "
-        lines.append(current_line)
+        ax2.text(0.1, y, disc_text, fontsize=8, wrap=True, 
+                bbox=dict(boxstyle='round', facecolor='#fff3cd', alpha=0.8))
         
-        for line in lines:
-            ax2.text(0.1, y_pos, line.strip(), fontsize=8, wrap=True, 
-                    bbox=dict(boxstyle='round', facecolor='#fff3e0', alpha=0.5))
-            y_pos -= line_height * 0.8
-        
-        pdf.savefig(fig2, dpi=300, bbox_inches='tight', facecolor='white')
+        pdf.savefig(fig2, dpi=150, bbox_inches='tight', facecolor='white')
         plt.close(fig2)
     
     buffer.seek(0)
     return buffer
 
 # Main UI
-st.markdown('<h1 class="main-header">🏗️ Architectural Blueprint Pro</h1>', 
-           unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Professional Site Planning & Analysis Tool | IBC 2024/2025 Compliant</p>', 
+st.markdown('<h1 class="main-header">🏗️ Architectural Blueprint Pro</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Professional Site Planning Tool | IBC 2024/2025 Compliant</p>', 
            unsafe_allow_html=True)
 
-# Professional sidebar
+# Sidebar
 with st.sidebar:
-    st.markdown('<h2 style="font-family: Inter; font-size: 1.2rem; margin-bottom: 1rem;">⚙️ Project Configuration</h2>', 
-               unsafe_allow_html=True)
+    st.header("⚙️ Configuration")
     
-    # Project Info
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1rem;">Project Details</p>', 
-               unsafe_allow_html=True)
+    st.subheader("Project Info")
     project_name = st.text_input("Project Name", "Sunset Ridge Residence")
     client_name = st.text_input("Client Name", "John Smith")
-    location = st.text_input("Project Location", "California, USA")
+    location = st.text_input("Location", "California, USA")
     
-    # Units and Standards
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1.5rem;">Standards & Units</p>', 
-               unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        units = st.selectbox("Units", ["ft", "m"])
-    with col2:
-        scale = st.selectbox("Scale", [100, 200, 500, 1000], index=1)
+    st.subheader("Standards")
+    units = st.selectbox("Units", ["ft", "m"])
+    scale = st.selectbox("Scale", [100, 200, 500, 1000], index=1)
     
-    drawing_standard = st.selectbox("Drawing Standard", 
-                                   ["ANSI (US)", "ISO (Metric)", "DIN (German)", "JIS (Japan)"])
-    plot_type = st.selectbox("Plot Type", 
-                            ["Residential Single-Family", "Residential Multi-Family", 
-                             "Commercial", "Industrial", "Mixed-Use"])
+    st.subheader("Dimensions")
+    site_width = st.number_input(f"Site Width ({units})", 10.0, 500.0, 60.0)
+    site_depth = st.number_input(f"Site Depth ({units})", 10.0, 500.0, 100.0)
+    building_width = st.number_input(f"Building Width ({units})", 5.0, 400.0, 40.0)
+    building_depth = st.number_input(f"Building Depth ({units})", 5.0, 400.0, 50.0)
     
-    # Site Dimensions
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1.5rem;">Site Dimensions</p>', 
-               unsafe_allow_html=True)
-    site_width = st.number_input(f"Site Width ({units})", min_value=10.0, max_value=500.0, value=60.0)
-    site_depth = st.number_input(f"Site Depth ({units})", min_value=10.0, max_value=500.0, value=100.0)
+    st.subheader("Setbacks")
+    c1, c2 = st.columns(2)
+    with c1:
+        front = st.number_input(f"Front ({units})", 0.0, 100.0, 20.0)
+        left = st.number_input(f"Left ({units})", 0.0, 100.0, 10.0)
+    with c2:
+        back = st.number_input(f"Rear ({units})", 0.0, 100.0, 15.0)
+        right = st.number_input(f"Right ({units})", 0.0, 100.0, 10.0)
     
-    # Building Dimensions
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1.5rem;">Building Footprint</p>', 
-               unsafe_allow_html=True)
-    building_width = st.number_input(f"Building Width ({units})", min_value=5.0, max_value=400.0, value=40.0)
-    building_depth = st.number_input(f"Building Depth ({units})", min_value=5.0, max_value=400.0, value=50.0)
-    
-    # Setbacks
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1.5rem;">Required Setbacks</p>', 
-               unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        front_setback = st.number_input(f"Front ({units})", min_value=0.0, value=20.0)
-        left_setback = st.number_input(f"Left ({units})", min_value=0.0, value=10.0)
-    with col2:
-        back_setback = st.number_input(f"Rear ({units})", min_value=0.0, value=15.0)
-        right_setback = st.number_input(f"Right ({units})", min_value=0.0, value=10.0)
-    
-    # Orientation
-    st.markdown('<p style="font-weight: 600; color: #0066cc; margin-top: 1.5rem;">Site Orientation</p>', 
-               unsafe_allow_html=True)
     orientation = st.slider("North Rotation (°)", 0, 360, 0)
     
     # Validation
-    total_building_width = building_width + left_setback + right_setback
-    total_building_depth = building_depth + front_setback + back_setback
+    total_w = building_width + left + right
+    total_d = building_depth + front + back
     
-    if total_building_width > site_width or total_building_depth > site_depth:
-        st.error("⚠️ Building exceeds site boundaries with setbacks!")
+    if total_w > site_width or total_d > site_depth:
+        st.error("⚠️ Building exceeds site boundaries!")
 
-# Main content area
-col1, col2 = col3, col4 = st.columns([2, 1])
+# Main area
+col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown('<div class="blueprint-card">', unsafe_allow_html=True)
-    st.markdown('<h3 class="section-title">📐 Blueprint Preview</h3>', unsafe_allow_html=True)
+    st.subheader("📐 Blueprint Preview")
     
-    # Generate button
-    if st.button("🎯 GENERATE PROFESSIONAL BLUEPRINT", use_container_width=True):
+    if st.button("🎯 GENERATE BLUEPRINT", use_container_width=True):
         params = {
             'project_name': project_name,
             'client_name': client_name,
@@ -596,126 +377,77 @@ with col1:
             'site_depth': site_depth,
             'building_width': building_width,
             'building_depth': building_depth,
-            'setbacks': [front_setback, back_setback, left_setback, right_setback],
+            'setbacks': [front, back, left, right],
             'orientation': orientation,
             'scale': scale,
-            'units': units,
-            'drawing_standard': drawing_standard,
-            'plot_type': plot_type
+            'units': units
         }
         
-        # Store in session state
-        st.session_state['blueprint_params'] = params
-        st.session_state['blueprint_generated'] = True
+        # Generate
+        fig = create_blueprint(params)
         
-        # Create blueprint
-        fig = create_architectural_blueprint(params)
-        st.session_state['current_fig'] = fig
-        
+        # Display
         st.pyplot(fig)
         
-        # Download buttons
-        col_dl1, col_dl2 = st.columns(2)
+        # Downloads
+        d1, d2 = st.columns(2)
         
-        with col_dl1:
-            # PNG download
+        with d1:
+            # PNG
             buf = io.BytesIO()
-            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none')
+            fig.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor='white')
             buf.seek(0)
             b64 = base64.b64encode(buf.read()).decode()
-            href = f'<a href="data:image/png;base64,{b64}" download="{project_name.replace(" ", "_")}_Blueprint.png" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; padding: 0.75rem; border-radius: 8px; text-align: center; font-weight: 600;">📥 Download High-Res PNG (300 DPI)</div></a>'
+            href = f'<a href="data:image/png;base64,{b64}" download="{project_name.replace(" ", "_")}_Blueprint.png"><div style="background:#0066cc;color:white;padding:10px;border-radius:5px;text-align:center;font-weight:bold;">📥 Download PNG (200 DPI)</div></a>'
             st.markdown(href, unsafe_allow_html=True)
         
-        with col_dl2:
-            # PDF download
-            pdf_buffer = generate_pdf(fig, params)
-            b64_pdf = base64.b64encode(pdf_buffer.read()).decode()
-            href_pdf = f'<a href="data:application/pdf;base64,{b64_pdf}" download="{project_name.replace(" ", "_")}_Blueprint_Package.pdf" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%); color: white; padding: 0.75rem; border-radius: 8px; text-align: center; font-weight: 600;">📄 Download PDF Package (Multi-Sheet)</div></a>'
+        with d2:
+            # PDF
+            pdf_buf = generate_pdf(fig, params)
+            b64_pdf = base64.b64encode(pdf_buf.read()).decode()
+            href_pdf = f'<a href="data:application/pdf;base64,{b64_pdf}" download="{project_name.replace(" ", "_")}_Package.pdf"><div style="background:#d32f2f;color:white;padding:10px;border-radius:5px;text-align:center;font-weight:bold;">📄 Download PDF Package</div></a>'
             st.markdown(href_pdf, unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
         # Disclaimer
-        st.markdown("""
-        <div class="disclaimer-box">
-        <strong>⚖️ Legal Notice:</strong> This blueprint is generated for preliminary planning and visualization purposes only. 
-        All dimensions must be field-verified by a licensed professional. Compliant with IBC 2024/2025 standards. 
-        Not for construction without engineer/architect stamp and permit approval.
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("⚖️ **Legal Notice:** For planning only. Verify dimensions on site. Complies with IBC 2024/2025.")
     
     else:
-        st.info("👈 Configure your project parameters in the sidebar and click 'Generate Professional Blueprint' to create your architectural drawing.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.info("👈 Configure parameters and click 'Generate Blueprint'")
 
 with col2:
-    st.markdown('<div class="blueprint-card">', unsafe_allow_html=True)
-    st.markdown('<h3 class="section-title">📊 Project Metrics</h3>', unsafe_allow_html=True)
+    st.subheader("📊 Metrics")
     
-    # Calculations
     site_area = site_width * site_depth
-    building_area = building_width * building_depth
-    coverage = (building_area / site_area) * 100 if site_area > 0 else 0
-    floor_area_ratio = building_area / site_area if site_area > 0 else 0
+    bldg_area = building_width * building_depth
+    coverage = (bldg_area / site_area) * 100 if site_area > 0 else 0
     
-    # Display metrics
     st.markdown(f"""
-    <div class="metric-box" style="margin-bottom: 0.8rem;">
-        <div style="font-size: 0.85rem; color: #666;">Site Area</div>
-        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">{site_area:.1f} <span style="font-size: 0.9rem;">{units}²</span></div>
+    <div class="metric-box" style="margin-bottom:10px;">
+        <div style="font-size:0.8rem;color:#666;">Site Area</div>
+        <div style="font-size:1.3rem;font-weight:bold;">{site_area:.1f} {units}²</div>
     </div>
-    
-    <div class="metric-box" style="margin-bottom: 0.8rem;">
-        <div style="font-size: 0.85rem; color: #666;">Building Footprint</div>
-        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">{building_area:.1f} <span style="font-size: 0.9rem;">{units}²</span></div>
+    <div class="metric-box" style="margin-bottom:10px;">
+        <div style="font-size:0.8rem;color:#666;">Building Area</div>
+        <div style="font-size:1.3rem;font-weight:bold;">{bldg_area:.1f} {units}²</div>
     </div>
-    
-    <div class="metric-box" style="margin-bottom: 0.8rem;">
-        <div style="font-size: 0.85rem; color: #666;">Site Coverage</div>
-        <div style="font-size: 1.4rem; font-weight: 700; color: {'#27ae60' if coverage < 50 else '#e74c3c'};">{coverage:.1f}%</div>
-        <div style="font-size: 0.75rem; color: #999;">{'Compliant' if coverage < 50 else 'Check local codes'}</div>
-    </div>
-    
-    <div class="metric-box" style="margin-bottom: 0.8rem;">
-        <div style="font-size: 0.85rem; color: #666;">FAR (Floor Area Ratio)</div>
-        <div style="font-size: 1.4rem; font-weight: 700; color: #2c3e50;">{floor_area_ratio:.2f}</div>
+    <div class="metric-box" style="margin-bottom:10px;">
+        <div style="font-size:0.8rem;color:#666;">Coverage</div>
+        <div style="font-size:1.3rem;font-weight:bold;color:{'green' if coverage < 50 else 'red'};">{coverage:.1f}%</div>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Standards info
-    st.markdown('<div class="blueprint-card" style="margin-top: 1rem;">', unsafe_allow_html=True)
-    st.markdown('<h3 class="section-title">🏛️ Code Compliance</h3>', unsafe_allow_html=True)
-    
+    st.subheader("🏛️ Standards")
     st.markdown("""
-    <div style="font-size: 0.9rem; line-height: 1.6;">
-    <p style="margin-bottom: 0.5rem;"><strong>Standards Applied:</strong></p>
-    <ul style="margin-left: 1rem; color: #555;">
-        <li>IBC 2024/2025</li>
-        <li>IRC 2024/2025</li>
-        <li>ANSI Y14.5</li>
-        <li>NFPA 101 2024</li>
-        <li>ADA 2010/2024</li>
-    </ul>
-    <p style="margin-top: 0.5rem; font-size: 0.8rem; color: #888; font-style: italic;">
-    *Verify with local AHJ for jurisdiction-specific amendments
-    </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    - IBC 2024/2025
+    - IRC 2024/2025
+    - ANSI Y14.5
+    - NFPA 101 2024
+    - ADA 2024
+    """)
 
-# Footer
+st.markdown("---")
 st.markdown("""
-<div style="text-align: center; margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 12px;">
-    <p style="color: #666; font-size: 0.9rem; margin-bottom: 0.5rem;">
-        <strong>Architectural Blueprint Pro v2.0</strong> | Professional Site Planning Tool
-    </p>
-    <p style="color: #999; font-size: 0.8rem;">
-        © 2025-2026 | Compliant with International Building Code Standards | 
-        For professional use only
-    </p>
+<div style="text-align:center;color:#666;font-size:0.8rem;">
+    <strong>Architectural Blueprint Pro</strong> | © 2025-2026 | Professional Site Planning Tool
 </div>
 """, unsafe_allow_html=True)
