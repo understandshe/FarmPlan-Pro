@@ -74,7 +74,8 @@ def draw_layout_map(layout_data: dict) -> bytes:
         color = ZONE_COLORS.get(zone['name'], "#D5D8DC")
         
         # Main zone rectangle with shadow effect
-        if is_main:
+        if __name__ == "__main__":
+    main()
             # Shadow
             ax.add_patch(mpatches.FancyBboxPatch(
                 (x+0.5, y-0.5-height), width, height,
